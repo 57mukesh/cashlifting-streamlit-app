@@ -5,11 +5,20 @@ import os
 from ultralytics import YOLO
 import uuid
 import ffmpeg
+import gdown  # Added for Google Drive download
 
-# Load model
+# Model download from Google Drive if not already present
 @st.cache_resource
 def load_model():
-    model_path = r"C:\Users\mukes\cashlifting_poc\runs\detect\cashlifting_augmented_v4b\weights\best.pt"
+    model_path = "model/best.pt"  # Use relative path for deployment
+
+    if not os.path.exists(model_path):
+        st.warning("🔄 Downloading model from Google Drive... Please wait...")
+        os.makedirs("model", exist_ok=True)
+        file_id = "1cNsMOayjiGrbR53XlC721x8TzV88RXmV"
+        url = f"https://drive.google.com/uc?id={file_id}"
+        gdown.download(url, model_path, quiet=False)
+
     return YOLO(model_path)
 
 model = load_model()
