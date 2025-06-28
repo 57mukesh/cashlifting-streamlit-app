@@ -64,9 +64,20 @@ if uploaded_file:
 
     st.success(f"✅ Detection complete! Processed {frame_count} frames.")
 
-    # Step 2: Use ffmpeg to re-encode for browser playback
+    import time
+
+    # Step 2: Use ffmpeg to re-encode for browser playback (after ensuring file exists)
     final_output_path = os.path.join(tempfile.gettempdir(), f"final_{uuid.uuid4().hex}.mp4")
-    ffmpeg.input(raw_output_path).output(final_output_path, vcodec='libx264', crf=23).run(overwrite_output=True)
+
+    # Wait briefly to ensure the file system syncs
+    time.sleep(1)
+
+    if os.path.exists(raw_output_path):
+        ffmpeg.input(raw_output_path).output(final_output_path, vcodec='libx264', crf=23).run(overwrite_output=True)
+    else:
+        st.error("⚠️ Failed to process video: raw output file not found.")
+        st.stop()
+
 
     # Step 3: Display and download final video
     with open(final_output_path, "rb") as vid_file:
