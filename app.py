@@ -1,16 +1,19 @@
-import streamlit as st
+import streamlit as st 
 import tempfile
 import cv2
 import os
 from ultralytics import YOLO
 import uuid
 import ffmpeg
-import gdown  # Added for Google Drive download
+import gdown
+import time
 
-# Model download from Google Drive if not already present
+# -------------------------------
+# 🔽 Model download from Google Drive if not already present
+# -------------------------------
 @st.cache_resource
 def load_model():
-    model_path = "model/best.pt"  # Use relative path for deployment
+    model_path = "model/best.pt"
 
     if not os.path.exists(model_path):
         st.warning("🔄 Downloading model from Google Drive... Please wait...")
@@ -23,28 +26,35 @@ def load_model():
 
 model = load_model()
 
+# -------------------------------
+# 📦 UI Layout
+# -------------------------------
 st.title("📦 Cashlifting Detection")
 st.markdown("Upload your `.mp4` video. We’ll detect suspicious actions and show the output video.")
 
 uploaded_file = st.file_uploader("📤 Upload video", type=["mp4"])
 
+# -------------------------------
+# 📼 Video Processing
+# -------------------------------
 if uploaded_file:
-    # Save uploaded file
+    # Step 1: Save uploaded video to temp path
     temp_input = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
     temp_input.write(uploaded_file.read())
     input_video_path = temp_input.name
 
-    st.subheader("Original Video")
+    st.subheader("🎥 Original Video")
     st.video(input_video_path)
 
-    # Prepare for writing output
+    # Step 2: Setup video writer for raw annotated output
     cap = cv2.VideoCapture(input_video_path)
-    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
 
-    # Step 1: Write with OpenCV to temp raw file
-    raw_output_path = os.path.join(tempfile.gettempdir(), f"raw_{uuid.uuid4().hex}.mp4")
+    raw_output_path = f"/tmp/raw_output_{uuid.uuid4().hex}.mp4"
+    final_output_path = f"/tmp/final_output_{uuid.uuid4().hex}.mp4"
+
     out = cv2.VideoWriter(raw_output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
 
     st.info("🔍 Detecting... Please wait...")
@@ -64,22 +74,20 @@ if uploaded_file:
 
     st.success(f"✅ Detection complete! Processed {frame_count} frames.")
 
-    import time
-
-    # Step 2: Use ffmpeg to re-encode for browser playback (after ensuring file exists)
-    final_output_path = os.path.join(tempfile.gettempdir(), f"final_{uuid.uuid4().hex}.mp4")
-
-    # Wait briefly to ensure the file system syncs
+    # Step 3: Wait & check file existence before ffmpeg
     time.sleep(1)
 
     if os.path.exists(raw_output_path):
-        ffmpeg.input(raw_output_path).output(final_output_path, vcodec='libx264', crf=23).run(overwrite_output=True)
+        try:
+            ffmpeg.input(raw_output_path).output(final_output_path, vcodec='libx264', crf=23).run(overwrite_output=True)
+        except Exception as e:
+            st.error(f"❌ FFmpeg processing failed: {e}")
+            st.stop()
     else:
         st.error("⚠️ Failed to process video: raw output file not found.")
         st.stop()
 
-
-    # Step 3: Display and download final video
+    # Step 4: Show & download final video
     with open(final_output_path, "rb") as vid_file:
         video_bytes = vid_file.read()
 
